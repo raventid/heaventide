@@ -16,7 +16,7 @@ import Data.Text
 import qualified Data.Vector as V
 import Data.UUID
 import Data.Time
--- import Data.UUID
+import qualified Data.Aeson as A
 
 
 -- host :: Data.ByteString.Internal.ByteString
@@ -57,7 +57,7 @@ connectionSettings = Connection.settings host port login password database
 
 
 -- Session with loading messages from database.
-loadMessages' :: Session (V.Vector (TUUID, TSTREAM_NAME, TType, TPosition, TGlobalPosition, TTime))
+loadMessages' :: Session (V.Vector (TUUID, TSTREAM_NAME, TType, TPosition, TGlobalPosition, A.Value, A.Value, TTime))
 loadMessages' = Session.statement 10 loadMessages''
 
 -- Statement for loading messages from database
@@ -70,20 +70,22 @@ type TGlobalPosition = Int64
 -- type TMetadata = JSONB -- Metadata about message is common in message store, maybe move to column?
 type TTime = TimeOfDay
 
-loadMessages'' :: Statement Int32 (V.Vector (TUUID, TSTREAM_NAME, TType, TPosition, TGlobalPosition, TTime))
+loadMessages'' :: Statement Int32 (V.Vector (TUUID, TSTREAM_NAME, TType, TPosition, TGlobalPosition, A.Value, A.Value, TTime))
 loadMessages'' = let
   sql =
-    "select id, stream_name, type, position, global_position, time from messages"
+    "select id, stream_name, type, position, global_position, data, metadata, time from messages where id <> '4c8dcf04-102c-4d5d-b94a-1faf52ad3526'"
   encoder =
     Encoders.param (Encoders.nonNullable Encoders.int4)
   decoder =
     Decoders.rowVector $
-      (,,,,,) <$>
+      (,,,,,,,) <$>
         Decoders.column (Decoders.nonNullable Decoders.uuid) <*>
         Decoders.column (Decoders.nonNullable Decoders.text) <*>
         Decoders.column (Decoders.nonNullable Decoders.text) <*>
         Decoders.column (Decoders.nonNullable Decoders.int8) <*>
         Decoders.column (Decoders.nonNullable Decoders.int8) <*>
+        Decoders.column (Decoders.nonNullable Decoders.jsonb) <*>
+        Decoders.column (Decoders.nonNullable Decoders.jsonb) <*>
         Decoders.column (Decoders.nonNullable Decoders.time)
   in Statement sql encoder decoder True
 
