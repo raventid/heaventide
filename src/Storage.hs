@@ -13,12 +13,17 @@ import qualified Hasql.Decoders as Decoders
 import qualified Hasql.Encoders as Encoders
 import qualified Hasql.Connection as Connection
 
-import Data.Text
+import Data.Text hiding (map)
 import qualified Data.Vector as V
 import Data.UUID
 import Data.Time
 import qualified Data.Aeson as A
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as LB
+import GHC.Generics
+
+
+import Data.Char (chr)
 
 -- Messages
 -- Describe how messages are represented in a system
@@ -34,13 +39,13 @@ import qualified Data.ByteString as B
 -- time            | 2019-08-07 19:40:07.722982
 data FlightNumberChanged = FlightNumberChanged
   {
-  flightInfoBookingToken :: UUID
-  , time :: Integer
-  , value :: Integer
-  , old_value :: Integer
-  , sequence :: Integer
-  , segmentIndex :: Integer
-  , processedTime :: Integer
+  flightInfoBookingToken :: String
+  , time :: String
+  , value :: String
+  , old_value :: String
+  , sequence :: String
+  , segmentIndex :: String
+  , processedTime :: String
   } deriving (Show, Generic)
 
 instance A.FromJSON FlightNumberChanged
@@ -81,8 +86,9 @@ connect = do
 loadMessages :: IO ()
 loadMessages = do
   Right connection <- Connection.acquire connectionSettings
-  Right result <- Session.run loadMessages' connection
-  V.mapM_ print result
+  result <- Session.run loadMessages' connection
+  -- V.mapM_
+  print result
 
 connectionSettings = Connection.settings host port login password database
 
@@ -92,10 +98,16 @@ type TSTREAM_NAME = Text
 type TType = Text
 type TPosition = Int64
 type TGlobalPosition = Int64
-type TData =  B.ByteString
-type TMetadata = B.ByteString
+type TData =  FlightNumberChanged
+type TMetadata = A.Value
 type TTime = TimeOfDay
 
+convertDecoder :: (Either String FlightNumberChanged, B.ByteString) -> Either Text FlightNumberChanged
+convertDecoder ((Left s), b) = Left (pack $ map (chr . fromEnum) (B.unpack b))
+convertDecoder ((Right v), _) = Right v
+
+decodeFlightNumberChange :: B.ByteString -> (Either String FlightNumberChanged, B.ByteString)
+decodeFlightNumberChange b = (A.eitherDecodeStrict b :: Either String FlightNumberChanged, b)
 
 -- Session with loading messages from database.
 loadMessages' :: Session (V.Vector (TUUID, TSTREAM_NAME, TType, TPosition, TGlobalPosition, TData, TMetadata, TTime))
@@ -115,7 +127,7 @@ loadMessages'' = let
         Decoders.column (Decoders.nonNullable Decoders.text) <*>
         Decoders.column (Decoders.nonNullable Decoders.int8) <*>
         Decoders.column (Decoders.nonNullable Decoders.int8) <*>
-        Decoders.column (Decoders.nonNullable (Decoders.jsonBytes (\b -> eitherDecode b :: Either String FlightNumberChanged))) <*>
+        Decoders.column (Decoders.nonNullable (Decoders.jsonBytes (convertDecoder . decodeFlightNumberChange))) <*>
         Decoders.column (Decoders.nonNullable Decoders.jsonb) <*>
         Decoders.column (Decoders.nonNullable Decoders.time)
   in Statement sql encoder decoder True
