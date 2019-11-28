@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Storage where
 
@@ -17,7 +18,37 @@ import qualified Data.Vector as V
 import Data.UUID
 import Data.Time
 import qualified Data.Aeson as A
+import qualified Data.ByteString as B
 
+-- Messages
+-- Describe how messages are represented in a system
+
+
+-- id              | 6d021da6-63b3-4701-8a18-78aaa6ae6b2b
+-- stream_name     | flightInfo-00000001-0000-4000-8000-000000000000
+-- type            | FlightNumberChanged
+-- position        | 0
+-- global_position | 2
+-- data            | {"time": "2000-01-01T00:00:00.001Z", "value": "3539", "oldValue": "5761", "sequence": 1, "bookingToken": "00000001-0000-4000-8000-000000000000", "segmentIndex": 0, "processedTime": "2019-08-07T19:40:07.697Z"}
+-- metadata        | {"causationMessagePosition": 0, "causationMessageStreamName": "callbackReceiver-123", "causationMessageGlobalPosition": 1}
+-- time            | 2019-08-07 19:40:07.722982
+data FlightNumberChanged = FlightNumberChanged
+  {
+  flightInfoBookingToken :: UUID
+  , time :: Integer
+  , value :: Integer
+  , old_value :: Integer
+  , sequence :: Integer
+  , segmentIndex :: Integer
+  , processedTime :: Integer
+  } deriving (Show, Generic)
+
+instance A.FromJSON FlightNumberChanged
+instance A.ToJSON FlightNumberChanged
+
+-- Postgresql
+-- "idle in transaction"
+-- Article "hunting idle in transaction"
 
 -- host :: Data.ByteString.Internal.ByteString
 host = "localhost"
@@ -55,22 +86,22 @@ loadMessages = do
 
 connectionSettings = Connection.settings host port login password database
 
-
--- Session with loading messages from database.
-loadMessages' :: Session (V.Vector (TUUID, TSTREAM_NAME, TType, TPosition, TGlobalPosition, A.Value, A.Value, TTime))
-loadMessages' = Session.statement 10 loadMessages''
-
 -- Statement for loading messages from database
 type TUUID = UUID
 type TSTREAM_NAME = Text
 type TType = Text
 type TPosition = Int64
 type TGlobalPosition = Int64
--- type TData = JSONB -- Content of message, unique to particular service. How to make decoders and encoders?
--- type TMetadata = JSONB -- Metadata about message is common in message store, maybe move to column?
+type TData =  B.ByteString
+type TMetadata = B.ByteString
 type TTime = TimeOfDay
 
-loadMessages'' :: Statement Int32 (V.Vector (TUUID, TSTREAM_NAME, TType, TPosition, TGlobalPosition, A.Value, A.Value, TTime))
+
+-- Session with loading messages from database.
+loadMessages' :: Session (V.Vector (TUUID, TSTREAM_NAME, TType, TPosition, TGlobalPosition, TData, TMetadata, TTime))
+loadMessages' = Session.statement 10 loadMessages''
+
+loadMessages'' :: Statement Int32 (V.Vector (TUUID, TSTREAM_NAME, TType, TPosition, TGlobalPosition, TData, TMetadata, TTime))
 loadMessages'' = let
   sql =
     "select id, stream_name, type, position, global_position, data, metadata, time from messages where id <> '4c8dcf04-102c-4d5d-b94a-1faf52ad3526'"
@@ -84,7 +115,7 @@ loadMessages'' = let
         Decoders.column (Decoders.nonNullable Decoders.text) <*>
         Decoders.column (Decoders.nonNullable Decoders.int8) <*>
         Decoders.column (Decoders.nonNullable Decoders.int8) <*>
-        Decoders.column (Decoders.nonNullable Decoders.jsonb) <*>
+        Decoders.column (Decoders.nonNullable (Decoders.jsonBytes (\b -> eitherDecode b :: Either String FlightNumberChanged))) <*>
         Decoders.column (Decoders.nonNullable Decoders.jsonb) <*>
         Decoders.column (Decoders.nonNullable Decoders.time)
   in Statement sql encoder decoder True

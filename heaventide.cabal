@@ -23,6 +23,7 @@ executable heaventide
   -- other-extensions:
   build-depends:       aeson,
                        base >=4.13 && <4.14,
+                       bytestring,
                        hasql,
                        text,
                        time,
