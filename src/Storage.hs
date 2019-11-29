@@ -24,6 +24,7 @@ import GHC.Generics
 
 
 import Data.Char (chr)
+import Data.List
 
 -- Messages
 -- Describe how messages are represented in a system
@@ -39,12 +40,12 @@ import Data.Char (chr)
 -- time            | 2019-08-07 19:40:07.722982
 data FlightNumberChanged = FlightNumberChanged
   {
-  flightInfoBookingToken :: String
+    bookingToken :: String
   , time :: String
   , value :: String
-  , old_value :: String
-  , sequence :: String
-  , segmentIndex :: String
+  , oldValue :: String
+  , sequence :: Integer
+  , segmentIndex :: Integer
   , processedTime :: String
   } deriving (Show, Generic)
 
@@ -102,12 +103,21 @@ type TData =  FlightNumberChanged
 type TMetadata = A.Value
 type TTime = TimeOfDay
 
+
+-- Some helpers for different string conversions (TODO: Remove all of this and use appropriate types)
+dropSohAndConvert :: B.ByteString -> Text
+dropSohAndConvert b = pack $ map (chr . fromEnum) $ Data.List.drop 1 $ (B.unpack b)
+
+-- Drop first byte of bytestring
+dropSohFromBytestring :: B.ByteString -> B.ByteString
+dropSohFromBytestring b = B.drop 1 b
+
 convertDecoder :: (Either String FlightNumberChanged, B.ByteString) -> Either Text FlightNumberChanged
-convertDecoder ((Left s), b) = Left (pack $ map (chr . fromEnum) (B.unpack b))
+convertDecoder ((Left s), b) = Left (pack s)
 convertDecoder ((Right v), _) = Right v
 
 decodeFlightNumberChange :: B.ByteString -> (Either String FlightNumberChanged, B.ByteString)
-decodeFlightNumberChange b = (A.eitherDecodeStrict b :: Either String FlightNumberChanged, b)
+decodeFlightNumberChange b = (A.eitherDecodeStrict (dropSohFromBytestring b) :: Either String FlightNumberChanged, b)
 
 -- Session with loading messages from database.
 loadMessages' :: Session (V.Vector (TUUID, TSTREAM_NAME, TType, TPosition, TGlobalPosition, TData, TMetadata, TTime))
@@ -116,7 +126,7 @@ loadMessages' = Session.statement 10 loadMessages''
 loadMessages'' :: Statement Int32 (V.Vector (TUUID, TSTREAM_NAME, TType, TPosition, TGlobalPosition, TData, TMetadata, TTime))
 loadMessages'' = let
   sql =
-    "select id, stream_name, type, position, global_position, data, metadata, time from messages where id <> '4c8dcf04-102c-4d5d-b94a-1faf52ad3526'"
+    "select id, stream_name, type, position, global_position, data, metadata, time from messages where id = '6d021da6-63b3-4701-8a18-78aaa6ae6b2b'"
   encoder =
     Encoders.param (Encoders.nonNullable Encoders.int4)
   decoder =
