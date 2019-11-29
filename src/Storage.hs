@@ -143,6 +143,24 @@ loadMessages'' = let
   in Statement sql encoder decoder True
 
 
+-- In case of Eventide eventstore I should just call stored procedure here, correct?
+-- Insert message into messages table.
+insertMessage'' :: Statement (Text, ByteString, Text, Maybe Text) Int32
+insertMessage'' = let
+  sql =
+    "insert into messages (email, password, name, phone) \
+    \values ($1, $2, $3, $4) \
+    \returning id"
+  encoder =
+    contrazip4
+      (E.param (E.nonNullable E.text))
+      (E.param (E.nonNullable E.bytea))
+      (E.param (E.nonNullable E.text))
+      (E.param (E.nullable E.text))
+  decoder =
+    D.singleRow ((D.column . D.nonNullable) D.int4)
+  in Statement sql encoder decoder True
+
 -- * Sessions
 --
 -- Session is an abstraction over the database connection and all possible errors.
@@ -190,3 +208,26 @@ divModStatement = Statement sql encoder decoder True where
       (,) <$>
       Decoders.column (Decoders.nonNullable Decoders.int8) <*>
       Decoders.column (Decoders.nonNullable Decoders.int8)
+
+
+-- Partition schema with Kafka
+
+-- Partition 1
+-- Command stream 1 P1 P2 P3
+-- Event stream 1 P1 P2 P3
+
+-- Partition 3
+-- Command stream 2 P1 P2 P3
+-- Event stream 2 P1 P2 P3
+
+
+-- We could have schema like this:
+-- {
+--      Partition 1: {
+--       command stream 2: ...,
+--       event stream 2: ...,
+--      }
+-- }
+
+-- So, we are not tracking a global position in store, but tracking a position in one partition.
+-- TODO: Automatic repartitioning will kill us.
