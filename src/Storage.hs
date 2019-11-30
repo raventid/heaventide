@@ -231,3 +231,31 @@ divModStatement = Statement sql encoder decoder True where
 
 -- So, we are not tracking a global position in store, but tracking a position in one partition.
 -- TODO: Automatic repartitioning will kill us.
+
+
+
+-- In case of Kafka, if we are moving events into ClickHouse
+-- Then the schema information will become wrong:
+-- {
+--      Partition 1: {
+--       command stream 2: ...,
+--       event stream 2: ...,
+--      }
+-- }
+
+-- We are tracking sequence number with our own events. So if we are reading another parition like
+
+-- UserStream: ... event_223, event_224, event_225
+-- And our stream: ... event_123, event_124
+
+
+  -- Our last sequence number from stream is 124
+-- But UserStream is larger and we will process event_223 and so on, even if they happened before `123`
+-- (for example UserStream has a lot of different types of events, but our event stream has just one type of event, in this case we will have much more events in our stream, than in User stream)
+
+-- If we are reinserting data back into Kafka, than we will have incorret data in our partiton schema:
+-- I.e. events might have another indexes and it might be another parition.
+
+
+-- in the same time we might see the same effect with Postgresql storage. If we are reinserting data
+-- from another storage and changing global position of those messages, than internal metadata of those messages will become incorrect.
