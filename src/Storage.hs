@@ -259,3 +259,6 @@ divModStatement = Statement sql encoder decoder True where
 
 -- in the same time we might see the same effect with Postgresql storage. If we are reinserting data
 -- from another storage and changing global position of those messages, than internal metadata of those messages will become incorrect.
+
+
+-- Add some more horizontal scaling notes TODO
