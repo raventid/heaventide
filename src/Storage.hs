@@ -22,6 +22,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import GHC.Generics
 
+import Contravariant.Extras.Contrazip
+
 
 import Data.Char (chr)
 import Data.List
@@ -103,6 +105,7 @@ type TData =  FlightNumberChanged
 type TMetadata = A.Value
 type TTime = TimeOfDay
 
+type TJustJSON = A.Value
 
 -- Some helpers for different string conversions (TODO: Remove all of this and use appropriate types)
 dropSohAndConvert :: B.ByteString -> Text
@@ -145,20 +148,23 @@ loadMessages'' = let
 
 -- In case of Eventide eventstore I should just call stored procedure here, correct?
 -- Insert message into messages table.
-insertMessage'' :: Statement (Text, ByteString, Text, Maybe Text) Int32
+-- We will use stored procedure to insert data and get last position for inserted message
+
+-- Here, first param is text, because write message accepts varchar and not uuid as first param
+-- TODO: Not sure it will work as expected
+insertMessage'' :: Statement (Text, TSTREAM_NAME, TType, TJustJSON, TMetadata, TTime) Int32
 insertMessage'' = let
-  sql =
-    "insert into messages (email, password, name, phone) \
-    \values ($1, $2, $3, $4) \
-    \returning id"
+  sql = "SELECT write_message($1::varchar, $2::varchar, $3::varchar, $4::jsonb, $5::jsonb, $6::bigint);"
   encoder =
-    contrazip4
-      (E.param (E.nonNullable E.text))
-      (E.param (E.nonNullable E.bytea))
-      (E.param (E.nonNullable E.text))
-      (E.param (E.nullable E.text))
+    contrazip6
+      (Encoders.param (Encoders.nonNullable Encoders.text))
+      (Encoders.param (Encoders.nonNullable Encoders.text))
+      (Encoders.param (Encoders.nonNullable Encoders.text))
+      (Encoders.param (Encoders.nonNullable Encoders.jsonb))
+      (Encoders.param (Encoders.nonNullable Encoders.jsonb))
+      (Encoders.param (Encoders.nonNullable Encoders.time))
   decoder =
-    D.singleRow ((D.column . D.nonNullable) D.int4)
+    Decoders.singleRow ((Decoders.column . Decoders.nonNullable) Decoders.int4)
   in Statement sql encoder decoder True
 
 -- * Sessions
