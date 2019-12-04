@@ -104,19 +104,6 @@ password = ""
 -- password :: Data.ByteString.Internal.ByteString
 database = ""
 
--- main :: IO ()
--- main = do
---   Right connection <- Connection.acquire connectionSettings
---   result <- Session.run (sumAndDivModSession 3 8 3) connection
---   print result
---   where
---     connectionSettings = Connection.settings "localhost" 5432 "postgres" "" "postgres"
-connect :: IO ()
-connect = do
-  Right connection <- Connection.acquire connectionSettings
-  result <- Session.run (sumAndDivModSession 3 8 3) connection
-  print result
-
 loadMessages :: IO ()
 loadMessages = do
   Right connection <- Connection.acquire connectionSettings
@@ -238,13 +225,6 @@ insertMessage'' = let
 -- submodule of your project.
 -------------------------
 
-sumAndDivModSession :: Int64 -> Int64 -> Int64 -> Session (Int64, Int64)
-sumAndDivModSession a b c = do
-  -- Get the sum of a and b
-  sumOfAAndB <- Session.statement (a, b) sumStatement
-  -- Divide the sum by c and get the modulo as well
-  Session.statement (sumOfAAndB, c) divModStatement
-
 
 -- * Statements
 --
@@ -255,26 +235,6 @@ sumAndDivModSession a b c = do
 -- It's recommended to define statements in a dedicated 'Statements'
 -- submodule of your project.
 -------------------------
-
-sumStatement :: Statement (Int64, Int64) Int64
-sumStatement = Statement sql encoder decoder True where
-  sql = "select $1 + $2"
-  encoder =
-    (fst >$< Encoders.param (Encoders.nonNullable Encoders.int8)) <>
-    (snd >$< Encoders.param (Encoders.nonNullable Encoders.int8))
-  decoder = Decoders.singleRow (Decoders.column (Decoders.nonNullable Decoders.int8))
-
-divModStatement :: Statement (Int64, Int64) (Int64, Int64)
-divModStatement = Statement sql encoder decoder True where
-  sql = "select $1 / $2, $1 % $2"
-  encoder =
-    (fst >$< Encoders.param (Encoders.nonNullable Encoders.int8)) <>
-    (snd >$< Encoders.param (Encoders.nonNullable Encoders.int8))
-  decoder = Decoders.singleRow row where
-    row =
-      (,) <$>
-      Decoders.column (Decoders.nonNullable Decoders.int8) <*>
-      Decoders.column (Decoders.nonNullable Decoders.int8)
 
 
 -- Partition schema with Kafka
