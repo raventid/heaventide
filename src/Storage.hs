@@ -3,7 +3,7 @@
 
 module Storage where
 
-import Prelude
+import Prelude hiding (sequence)
 import Data.Int
 import Data.Functor.Contravariant
 import Hasql.Session (Session)
@@ -54,6 +54,15 @@ data FlightNumberChanged = FlightNumberChanged
 instance A.FromJSON FlightNumberChanged
 instance A.ToJSON FlightNumberChanged
 
+toData :: FlightNumberChanged -> (Text, TSTREAM_NAME, TType, B.ByteString, TMetadata)
+toData flightNC = (
+  (pack . bookingToken) flightNC,
+  "flightInfo-00000001-0000-4000-8000-000000000000",
+  "FlightNumberChanged",
+  (LB.toStrict . A.encode) flightNC,
+  "{\"stub\":\"stub\"}"
+  )
+
 -- Postgresql
 -- "idle in transaction"
 -- Article "hunting idle in transaction"
@@ -91,6 +100,23 @@ loadMessages = do
   Right connection <- Connection.acquire connectionSettings
   result <- Session.run loadMessages' connection
   -- V.mapM_
+  print result
+
+insertMessage :: IO ()
+insertMessage = do
+  Right connection <- Connection.acquire connectionSettings
+  currentTime <- getCurrentTime
+  let flightNC = FlightNumberChanged {
+    bookingToken="ae747185-3a4b-40de-86cf-d05897d85d54"
+  , time="2000-01-01T00:00:00.001Z"
+  , value="4569"
+  , oldValue="8957"
+  , sequence=50
+  , segmentIndex=19
+  , processedTime="2000-01-01T00:10:00.001Z"
+  }
+-- (utcToLocalTime utc currentTime)
+  result <- Session.run (insertMessage' (toData flightNC)) connection
   print result
 
 connectionSettings = Connection.settings host port login password database
@@ -146,23 +172,28 @@ loadMessages'' = let
   in Statement sql encoder decoder True
 
 
+
+insertMessage' :: (Text, TSTREAM_NAME, TType, B.ByteString, TMetadata) -> Session Int32
+insertMessage' (a,b,c,d,e) = Session.statement (a,b,c,d,e) insertMessage''
+
 -- In case of Eventide eventstore I should just call stored procedure here, correct?
 -- Insert message into messages table.
 -- We will use stored procedure to insert data and get last position for inserted message
 
 -- Here, first param is text, because write message accepts varchar and not uuid as first param
 -- TODO: Not sure it will work as expected
-insertMessage'' :: Statement (Text, TSTREAM_NAME, TType, TJustJSON, TMetadata, TTime) Int32
+
+-- TODO: Add one more param for EXPECTED_VERSION check (aka optimisstic concurrency)
+insertMessage'' :: Statement (Text, TSTREAM_NAME, TType, B.ByteString, TMetadata) Int32
 insertMessage'' = let
-  sql = "SELECT write_message($1::varchar, $2::varchar, $3::varchar, $4::jsonb, $5::jsonb, $6::bigint);"
+  sql = "SELECT write_message($1::varchar, $2::varchar, $3::varchar, $4::jsonb, $5::jsonb);"
   encoder =
-    contrazip6
+    contrazip5
       (Encoders.param (Encoders.nonNullable Encoders.text))
       (Encoders.param (Encoders.nonNullable Encoders.text))
       (Encoders.param (Encoders.nonNullable Encoders.text))
+      (Encoders.param (Encoders.nonNullable Encoders.jsonBytes))
       (Encoders.param (Encoders.nonNullable Encoders.jsonb))
-      (Encoders.param (Encoders.nonNullable Encoders.jsonb))
-      (Encoders.param (Encoders.nonNullable Encoders.time))
   decoder =
     Decoders.singleRow ((Decoders.column . Decoders.nonNullable) Decoders.int4)
   in Statement sql encoder decoder True

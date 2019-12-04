@@ -8,6 +8,7 @@ run :: IO ()
 run = do
   putStrLn (Hello.f ++ " " ++ World.w)
   loadMessages -- Обрабатываем сообщения.
+  insertMessage -- Записываем новые ивенты
 
 -- Entity : TODO
 
