@@ -28,6 +28,23 @@ import Contravariant.Extras.Contrazip
 import Data.Char (chr)
 import Data.List
 
+
+-- Common message structure
+-- data Message = Message Token StreamName Type Data MetaData
+
+
+-- Metadata
+-- Here, there is a small problem.
+-- correlationStreamName is optional and might not present in response and should not be set
+-- when we are writing message (because service in another language might not be ready for this)
+data MetaData = MetaData
+  {
+    causationMessagePosition :: Integer -- 0
+  , causationMessageStreamName :: Text -- "callbackReceiver-123"
+  , causationMessageGlobalPosition :: Integer -- 1
+  }
+
+
 -- Messages
 -- Describe how messages are represented in a system
 
