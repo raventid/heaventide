@@ -19,7 +19,7 @@ extra-source-files:  CHANGELOG.md
 
 executable heaventide
   main-is:             Main.hs
-  other-modules:       Runner, World, Hello, Storage
+  other-modules:       Runner, Storage
   -- other-extensions:
   build-depends:       aeson,
                        base >=4.13 && <4.14,
