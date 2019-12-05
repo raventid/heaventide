@@ -47,6 +47,13 @@ data TMetaData = TMetaData
   , causationMessageGlobalPosition :: Integer -- 1
   } deriving (Show, Generic)
 
+copyMetaData :: TMetaData -> TMetaData
+copyMetaData TMetaData{causationMessagePosition=cmp, causationMessageGlobalPosition=cmgp, causationMessageStreamName=cmsn} = TMetaData{
+  causationMessagePosition=cmp
+  , causationMessageStreamName=cmsn
+  , causationMessageGlobalPosition=cmgp
+  }
+
 instance A.ToJSON TMetaData
 instance A.FromJSON TMetaData
 
@@ -76,8 +83,8 @@ data FlightNumberChanged = FlightNumberChanged
 instance A.FromJSON FlightNumberChanged
 instance A.ToJSON FlightNumberChanged
 
-toData :: FlightNumberChanged -> TMetaData -> (Text, TSTREAM_NAME, TType, B.ByteString, B.ByteString)
-toData flightNC meta = (
+toMessageFormat :: FlightNumberChanged -> TMetaData -> (Text, TSTREAM_NAME, TType, B.ByteString, B.ByteString)
+toMessageFormat flightNC meta = (
   (pack . bookingToken) flightNC,
   "flightInfo-00000001-0000-4000-8000-000000000000",
   "FlightNumberChanged",
@@ -133,7 +140,7 @@ insertMessage = do
   }
 
 -- (utcToLocalTime utc currentTime)
-  result <- Session.run (insertMessage' (toData flightNC meta)) connection
+  result <- Session.run (insertMessage' (toMessageFormat flightNC meta)) connection
   print result
 
 connectionSettings = Connection.settings host port login password database
