@@ -127,9 +127,9 @@ insertMessage = do
   }
 
   let meta = TMetaData {
-    causationMessagePosition = 0
-  , causationMessageStreamName = "callbackReceiver-123"
-  , causationMessageGlobalPosition = 1
+    causationMessagePosition=0
+  , causationMessageStreamName="callbackReceiver-123"
+  , causationMessageGlobalPosition=1
   }
 
 -- (utcToLocalTime utc currentTime)
