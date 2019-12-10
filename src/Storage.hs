@@ -71,13 +71,13 @@ instance A.FromJSON TMetaData
 -- time            | 2019-08-07 19:40:07.722982
 data FlightNumberChanged = FlightNumberChanged
   {
-    bookingToken :: String
-  , time :: String
-  , value :: String
-  , oldValue :: String
+    bookingToken :: Text
+  , time :: Text
+  , value :: Text
+  , oldValue :: Text
   , sequence :: Integer
   , segmentIndex :: Integer
-  , processedTime :: String
+  , processedTime :: Text
   } deriving (Show, Generic)
 
 instance A.FromJSON FlightNumberChanged
@@ -85,7 +85,7 @@ instance A.ToJSON FlightNumberChanged
 
 toMessageFormat :: FlightNumberChanged -> TMetaData -> (Text, TSTREAM_NAME, TType, B.ByteString, B.ByteString)
 toMessageFormat flightNC meta = (
-  (pack . bookingToken) flightNC,
+  bookingToken flightNC,
   "flightInfo-00000001-0000-4000-8000-000000000000",
   "FlightNumberChanged",
   (LB.toStrict . A.encode) flightNC,
